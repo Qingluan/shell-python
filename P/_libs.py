@@ -45,6 +45,8 @@ class Sess:
         self.tmp_file = os.path.join(ROOT,token)
         self._attres = dict()
         self._inputs = []
+        self._pre_config = set()
+        self.history = []
         sys.path.insert(0, "")
         if not os.path.exists(self.tmp_file) or not os.path.exists(self.tmp_file+ ".pyd"):
             self.save()
@@ -54,22 +56,39 @@ class Sess:
     def clear(self):
         self._attres = dict()
         self._inputs = []
+        self._pre_config = set()
         self.save()
 
     def save(self):
         # with open(self.tmp_file+"f", "wb") as fp:
             # pickle.dump(self._functions,fp)
+        try:
+            with open(self.tmp_file, "wb") as fp:
+                pickle.dump(self._attres,fp)
+        except Exception as e:
+            with open(self.tmp_file, "wb") as fp:
+                pickle2.dump(self._attres,fp)
 
-        with open(self.tmp_file, "wb") as fp:
-            pickle.dump(self._attres,fp)
-        
         with open(self.tmp_file + ".pyd" , "wb") as fp:
-            pickle.dump(self._inputs, fp)
+            pickle2.dump(self._inputs, fp)
+
+        with open(self.tmp_file + ".pyccc" , "wb") as fp:
+            pickle2.dump(self._pre_config, fp)
+
+        with open(self.tmp_file + ".hist" , "w") as fp:
+            fp.writelines(self.history)
 
     def load(self):
         if not os.path.exists(self.tmp_file):
             termcolor.cprint("no such file", "red")
-            return 
+            return
+
+        if not os.path.exists(self.tmp_file + ".hist"):
+            termcolor.cprint("no such hist file " , "red")
+            return
+
+        with open(self.tmp_file + ".hist") as fp:
+            self.history = fp.readlines()
 
         # with open(self.tmp_file + "f", "rb") as fp:
         #     self._functions = pickle.load(fp)
@@ -86,6 +105,12 @@ class Sess:
             except Exception:
                 with open(self.tmp_file + '.pyd', "rb") as fp:
                     self._inputs = pickle2.load(fp)
+
+            if os.path.exists(self.tmp_file + '.pyccc'):
+                with open(self.tmp_file + '.pyccc', "rb") as fp:
+                    self._pre_config = pickle2.load(fp)
+
+
         except ModuleNotFoundError:
             print("Path uncorrect")
             sys.exit(1)
@@ -94,9 +119,17 @@ class Sess:
         if hasattr(self._attres, w):
             return "self.sess._attres." + w
         return w
-    
+
+    def add_preconfig(self, f):
+        if f in self._pre_config:
+            return False
+
+        self._pre_config.add(f)
+        return True
+
     def add_attr(self, w, v):
         self._attres[w] = v
+
 
     def add_input(self, i):
         self._inputs.append(i)
@@ -116,9 +149,9 @@ class Sess:
     #         setattr(self._attres, w.strip(), v)
     #     else:
     #         w = w.replace("self.sess._attres.", "")
-            
+
     #         setattr(self._attres, w.strip(), v)
-            
+
     def print_in(self, inline):
         s = termcolor.colored("[%d]" % len(self._inputs), 'green')  + ": " + termcolor.colored(inline, "yellow")
         print(s)
@@ -136,8 +169,12 @@ class Sess:
     #             r = input("[AnyPress /Enter Next]")
     #             if r.strip():
     #                 break
-
     def print_out(self, out):
+        s = termcolor.colored("=> ", 'red') + str(out)
+        print(s)
+
+
+    def eprint_out(self, out):
         with Display.jump(20, 2):
             with Display.reverse():
                 with Display.bold():
@@ -146,15 +183,17 @@ class Sess:
                     print("          ")
             s = termcolor.colored("=> ", 'red') + str(out)
             print(s)
-            if isinstance(out, (FunctionType,  BuiltinFunctionType, BuiltinMethodType,)):
-                self.print_out(out())
-            elif isinstance(out, (GeneratorType,Iterable)):
-                for i in out:
-                    s = termcolor.colored("    ->", 'red')
-                    print(s,i)
-                    r = input("[AnyPress /Enter Next]")
-                    if r.strip():
-                        break
+            # if isinstance(out, (FunctionType,  BuiltinFunctionType, BuiltinMethodType,)):
+                # res = out()
+                # print("-------------- FunctionType --------")
+                # print(termcolor.colored("=> ", 'red'), res)
+            # elif isinstance(out, (GeneratorType,Iterable)):
+                # for i in out:
+                    # s = termcolor.colored("    ->", 'red')
+                    # print(s,i)
+                    # r = input("[AnyPres /En Next]")
+                    # if r.strip():
+                        # break
 
 
 
@@ -169,6 +208,7 @@ class Display:
             os.system("tput cnorm")
             yield
         finally:
+            input("End")
             os.system("tput clear && tput sgr0  && tput rc")
 
     @contextmanager
@@ -195,5 +235,3 @@ class Display:
             yield
         finally:
             os.system("tput sgr0")
-
-    

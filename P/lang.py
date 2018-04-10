@@ -23,9 +23,14 @@ else:
 """
 
 class LangTree:
+
     def __init__(self, sess):
         self.sess = sess
-        self.module("import sys, os")
+        self.module("import sys")
+        self.module("import os")
+        self.module("import time")
+        self.module("import urllib.request as ur")
+        self.module("import urllib.parse as up")
         sys.path.insert(0, "")
         # self.sess._attres = globals()
 
@@ -43,8 +48,8 @@ class LangTree:
             if group.group("r") != 'import' or not group.group("rc"):
                 return
             attrs = group.group("rc")
-        
-        
+
+
         name = group.group("n")
         lib = importlib.import_module(import_str)
 
@@ -56,7 +61,7 @@ class LangTree:
                 name = lib.__name__
             else:
                 name = attrs
-        
+
         self.sess.add_attr(name, lib)
         return True
 
@@ -65,7 +70,7 @@ class LangTree:
             for i in self.sess._attres.__dict__:
                 cprint(i + " =>" + str(self.sess._attres.__dict__[i]), 'green')
 
-    
+
     def eval(self, string):
         try:
             res = eval(string)
@@ -93,7 +98,7 @@ class LangTree:
 
         for f in pys:
             cprint("-->" + f , "blue")
-            
+
             for m in words:
                 try:
                     cmd = "from %s import %s" % (f.split(".")[0], m)
@@ -107,7 +112,7 @@ class LangTree:
         res = ''
         if words[0] in self.sess._attres:
             res = self.repl3(words[0]+".__dir__()")
-            
+
         pys = [ i for i in os.listdir() if i.endswith(".py")]
         for f in pys:
             with open(f) as fp:
@@ -121,7 +126,7 @@ class LangTree:
                             continue
 
                     if len(funs) > 0:
-                    
+
                         if l[0] != ' ':
                             function = ''.join(funs)
                             self.sess.print_out(function + "\n\n ------ attrs ------\n" + colored(str(res),"yellow"))
@@ -130,9 +135,9 @@ class LangTree:
                             fun = False
                         else:
                             funs.append(l)
-                    
+
                     if l.startswith("def"):
-                        
+
                         fun_name = l.split("def", 1)[1].split("(")[0].strip()
                         # print(fun_name)
                         if fun_name in words:
@@ -156,7 +161,7 @@ class LangTree:
                     fun_name = ''
                     fun = False
 
-        
+
 
     def load_funcs(self):
         pys = [ i for i in os.listdir() if i.endswith(".py")]
@@ -176,7 +181,7 @@ class LangTree:
                     cl = re.findall(r'^class\s+(\w+)\s*(?:\(\w+\))?\:', l)
                     if cl:
                         classes.append(cl[0])
-                    
+
                     at = re.findall(r'^(\w+?)\s*\=', l)
                     if at:
                         attrs.append(at[0])
@@ -206,7 +211,7 @@ class LangTree:
             r = self.try_load(string, r)
             if not r:
                 r = self.guess_string(string, r)
-            
+
             if r is not None:
                 string = l + " = " + r
                 print(string)
@@ -225,7 +230,7 @@ class LangTree:
 
         self.sess.add_input(string)
         return res
-    
+
 
     def parse_quote(self, string):
         unquote = re.split(r'[\"\'].+?[\"\']', string)
@@ -240,7 +245,7 @@ class LangTree:
             tm = ''
             for w in ws:
                 g = self.sess.search(w)
-                
+
                 t = t[:si] + t[si:].replace(w, g, 1)
                 si = t.index(w)
                 si += 1
@@ -252,9 +257,9 @@ class LangTree:
         for i in range(len(r)):
             res.append(r[i])
             res.append(l[i+1])
-        
+
         return ''.join(res)
-    
+
     def info(self):
         pys = [ i for i in os.listdir() if i.endswith(".py")]
         for f in pys:
@@ -273,7 +278,7 @@ class LangTree:
                     cl = re.findall(r'^class\s+(\w+)\s*(?:\(\w+\))?\:', l)
                     if cl:
                         classes.append(cl[0])
-                    
+
                     at = re.findall(r'^(\w+?)\s*\=', l)
                     if at:
                         attrs.append(at[0])
@@ -286,14 +291,16 @@ class LangTree:
                 for a in attrs:
                     cprint(colored("[Var] : ","blue") + a, "yellow")
 
-    def Test(self, fun, args, tp=False):
+    def Test(self, fun, args, tp=False, pre_load=True):
+        if pre_load:
+            self.load_pre_config()
 
         self.try_load(fun,fun+"(")
-    
+
         if isinstance(args, (list, tuple,)):
             if tp == True:
                 new_args = ['tmp_%d = """%s"""\n' % (i,open(f).read()) for i,f in enumerate(args) if os.path.exists(f)]
-                cmd_shell = ''.join(new_args) + "res = %s(%s)" % (fun, ','.join(['tmp_%d' % i for i in range(len(args))]))
+                cmd_shell = (''.join(new_args) + "res = %s({})" % fun).format(','.join(['tmp_%d' % i for i in range(len(args))]))
                 cmd_shell += TEMPLATES
                 print(cmd_shell)
                 self.repl2(cmd_shell)
@@ -302,12 +309,12 @@ class LangTree:
                 new_args = [int(i) if re.match(r'^\d+$',i.strip()) else "'%s'" % i for i in args ]
         else:
             new_args = ['tmp_0 = """%s"""\n' % args]
-            cmd_shell =  ''.join(new_args) + "res = %s(%s)" % (fun, ','.join(['tmp_%d' for i in range(len(args))]))
+            cmd_shell =  ''.join(new_args) + ("res = %s(%s)" % fun).format(','.join(['tmp_%d' for i in range(len(args))]))
             cmd_shell += TEMPLATES
             self.repl2(cmd_shell)
             sys.exit(0)
 
-        cprint("patch -> %s" % "%s(%s)" %(fun, ','.join(new_args)), 'yellow')    
+        cprint("patch -> %s" % "%s(%s)" %(fun, ','.join(new_args)), 'yellow')
         res =  self.repl3("%s(%s)" %(fun, ','.join(new_args)))
         if isinstance(res, GeneratorType):
             for i in res:
@@ -327,13 +334,22 @@ class LangTree:
             return f
         return True
 
+    def load_pre_config(self):
+        pys = [ i for i in os.listdir() if i.endswith(".pycc")]
+        for f in pys:
+            if self.sess.add_preconfig(f):
+                with open(f) as fp:
+                    content = fp.read()
+                    self.repl2(content)
 
 
-    def Parse(self, strings):
+    def Parse(self, strings, pre_load=True):
         funs = []
         fun_name = ''
         dine_fun = False
         mul_line = False
+        if pre_load:
+            self.load_pre_config()
         for l in  strings.split("\n"):
             # cprint(l, "yellow")
 
@@ -347,7 +363,7 @@ class LangTree:
                 sys.exit(0)
             elif l == "%load":
                 self.load_funcs()
-                self.save()
+                self.sess.save()
                 sys.exit(0)
             elif l == "%info" or l == "%i":
                 self.info()
@@ -362,12 +378,11 @@ class LangTree:
                 mul_line = True
                 break
 
-            help_words = re.findall(r'(\w+)[\?\.]', l)
+            help_words = re.findall(r'(\w+)[\?]', l)
             if help_words:
                 cprint("-> help", 'yellow')
                 self.try_help(help_words)
                 sys.exit(0)
-            
             if not dine_fun:
                 if self.module(l):
                     continue
@@ -380,13 +395,11 @@ class LangTree:
 
             if l.startswith("def"):
                 funs.append(l)
-                
                 fun_name = l.split("def", 1)[1].split("(")[0]
                 # print("Define: ",fun_name)
                 dine_fun = True
                 continue
-                
-            
+
             if len(funs) > 0:
                 if l[0] != ' ':
                     # funs.append(l)
@@ -398,9 +411,7 @@ class LangTree:
                     fun_name = ''
                     dine_fun = False
                 elif  l.startswith("    return"):
-                    
                     # funs.append(l)
-                    
                     function = '\n'.join(funs)
                     cprint(function, 'green')
                     self.repl2(function)
@@ -426,14 +437,16 @@ class LangTree:
         if mul_line:
             self.sess.print_in(" ---> tmp")
             self.repl2(strings)
-    
+
     def repl2(self, string):
         exec(string, self.sess._attres,self.sess._attres)
-        self.sess.add_input(string)          
+        self.sess.history.append(string)
+        self.sess.add_input(string)
 
     def repl3(self, string):
         res = self.parse_setattr(string)
-        
+        self.sess.history.append(string)
+        self.sess.add_input(string)
         return res
 
     def repl(self, string):
@@ -464,4 +477,3 @@ def test(*fs):
         for i in f:
             if "sys" in i:
                 yield i
-    
