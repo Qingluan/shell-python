@@ -97,21 +97,22 @@ class LangTree:
     def try_load(self, string, r):
         pys = [ i for i in os.listdir() if i.endswith(".py")]
 
-        words = re.findall(r'(\w+)\s*\(', r)
+        words = re.findall(r'(\w+)\(', r)
         if not words:
-            words = re.findall(r'(\w+)\s', r)
+            words = re.findall(r'(\w+)\(', r)
 
         for f in pys:
             cprint("-->" + f , "blue")
-
-            for m in words:
-                try:
-                    cmd = "from %s import %s" % (f.split(".")[0], m)
-                    self.module(cmd)
-                    cprint(" |" + cmd, 'yellow')
-                    return r
-                except AttributeError:
-                    pass
+            with open(f) as pfp:
+                for m in words:
+                    if m in pfp.read():
+                        try:
+                            cmd = "from %s import %s" % (f.split(".")[0], m)
+                            self.module(cmd)
+                            cprint(" |" + cmd, 'yellow')
+                            return r
+                        except AttributeError:
+                            pass
 
     def try_help(self, words):
         res = ''

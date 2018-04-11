@@ -17,7 +17,7 @@ class MyInstall(install):
         install.run(self)
 
 setup(name='mroy-line',
-    version='0.4.1',
+    version='0.4.2',
     cmdclass={
         'install': MyInstall,
     },
