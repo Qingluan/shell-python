@@ -26,12 +26,16 @@ class LangTree:
 
     def __init__(self, sess):
         self.sess = sess
-        self.module("import sys")
-        self.module("import os")
-        self.module("import time")
-        self.module("import urllib.request as ur")
-        self.module("import urllib.parse as up")
-        sys.path.insert(0, "")
+        self.pre_import()
+
+    def pre_import(self):
+        if  "os" not in  self.sess._attres:
+            self.module("import sys")
+            self.module("import os")
+            self.module("import time")
+            self.module("import urllib.request as ur")
+            self.module("import urllib.parse as up")
+            sys.path.insert(0, "")
         # self.sess._attres = globals()
 
     def module(self, string):
@@ -61,8 +65,9 @@ class LangTree:
                 name = lib.__name__
             else:
                 name = attrs
-
+        self.sess.history.append(string.strip())
         self.sess.add_attr(name, lib)
+        self.sess.add_input(string.strip())
         return True
 
     def cmd(self, string):
@@ -309,13 +314,14 @@ class LangTree:
                 new_args = [int(i) if re.match(r'^\d+$',i.strip()) else "'%s'" % i for i in args ]
         else:
             new_args = ['tmp_0 = """%s"""\n' % args]
-            cmd_shell =  ''.join(new_args) + ("res = %s(%s)" % fun).format(','.join(['tmp_%d' for i in range(len(args))]))
+            cmd_shell =  ''.join(new_args) + ("res = %s({})" % fun).format(','.join(['tmp_%d' for i in range(len(args))]))
             cmd_shell += TEMPLATES
+            print(cmd_shell)
             self.repl2(cmd_shell)
             sys.exit(0)
 
-        cprint("patch -> %s" % "%s(%s)" %(fun, ','.join(new_args)), 'yellow')
-        res =  self.repl3("%s(%s)" %(fun, ','.join(new_args)))
+        # cprint("patch -> %s" % ("%s({})" %fun).format(','.join([int(i) if isinstance(i, int) else i for i in new_args])), 'yellow')
+        res =  self.repl3("_=%s(%s)" %(fun, ','.join([str(i) if isinstance(i, int) else i for i in  new_args])))
         if isinstance(res, GeneratorType):
             for i in res:
                 self.sess.print_out(i)
@@ -371,7 +377,7 @@ class LangTree:
 
             elif l == "%hist" or l == "%h":
                 for i,l in enumerate(self.sess._inputs):
-                    cprint('%2d' % i + ":" + l, 'green')
+                    cprint(colored('%3d' % i + "|","blue") + l, 'green')
                 sys.exit(0)
 
             if l.count("'") % 2 == 1 or l.count('"') % 2 == 1:
@@ -446,7 +452,6 @@ class LangTree:
     def repl3(self, string):
         res = self.parse_setattr(string)
         self.sess.history.append(string)
-        self.sess.add_input(string)
         return res
 
     def repl(self, string):

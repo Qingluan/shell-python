@@ -32,7 +32,7 @@ def run():
             # w = sys.stdin.read()
             # print(sys.argv)
 
-            if not args.shell:
+            if not args.shell and not args.test_function:
                 print("From Stdin:")
                 w = sys.stdin.read()
                 if args.test_function:
